@@ -1,0 +1,61 @@
+@model Aggregator.Admin.ExchangeSimulator.ExchangeServer
+
+@{
+    ViewData["Title"] = $"Settings - {Model.Name}";
+}
+
+<h2>Settings for @Model.Name</h2>
+
+<div class="card">
+    <div class="card-header">
+        <h5>Server Settings</h5>
+    </div>
+    <div class="card-body">
+        <form asp-action="UpdateFrequency" method="post">
+            <input type="hidden" name="name" value="@Model.Name" />
+
+            <div class="form-group">
+                <label for="frequency">Frequency (milliseconds)</label>
+                <input type="number" class="form-control" id="frequency" name="frequency" value="@Model.Frequency" min="100" max="10000" required />
+                <small class="form-text text-muted">Minimum 100ms, maximum 10000ms</small>
+            </div>
+
+            <div class="mt-3">
+                <button type="submit" class="btn btn-primary">Update Frequency</button>
+                <a href="@Url.Action("Index", "Exchange")" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card mt-3">
+    <div class="card-header">
+        <h5>Advanced Controls</h5>
+    </div>
+    <div class="card-body">
+        <p>These controls allow you to simulate network conditions:</p>
+        <div class="btn-group" role="group" aria-label="Advanced controls">
+            <a href="@Url.Action("Disconnect", "Exchange", new { name = Model.Name })"
+               class="btn btn-outline-danger btn-sm">
+                Disconnect Client
+            </a>
+            <a href="@Url.Action("Resend", "Exchange", new { name = Model.Name, count = 1 })"
+               class="btn btn-outline-primary btn-sm">
+                Resend 1x
+            </a>
+            <a href="@Url.Action("Resend", "Exchange", new { name = Model.Name, count = 3 })"
+               class="btn btn-outline-primary btn-sm">
+                Resend 3x
+            </a>
+            <a href="@Url.Action("Resend", "Exchange", new { name = Model.Name, count = 5 })"
+               class="btn btn-outline-primary btn-sm">
+                Resend 5x
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="mt-3">
+    <a href="@Url.Action("Index", "Exchange")" class="btn btn-secondary">Back to Servers</a>
+</div>
+
