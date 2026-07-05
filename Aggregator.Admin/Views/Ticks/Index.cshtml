@@ -32,7 +32,6 @@
                 <th>Price</th>
                 <th>Volume</th>
                 <th>Timestamp</th>
-                <th>Created At</th>
             </tr>
         </thead>
         <tbody id="ticksBody">
@@ -44,7 +43,6 @@
                     <td>@tick.Price</td>
                     <td>@tick.Volume</td>
                     <td>@tick.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")</td>
-                    <td>@tick.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")</td>
                 </tr>
             }
         </tbody>
@@ -87,7 +85,6 @@
                             '<td>' + tick.price + '</td>' +
                             '<td>' + tick.volume + '</td>' +
                             '<td>' + new Date(tick.timestamp).toLocaleString() + '</td>' +
-                            '<td>' + new Date(tick.createdAt).toLocaleString() + '</td>' +
                             '</tr>';
                         tbody.append(row);
                     });
