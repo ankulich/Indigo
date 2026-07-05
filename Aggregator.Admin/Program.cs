@@ -9,7 +9,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllersWithViews();
 
 // Register services
-builder.Services.AddSingleton<ITickRepository, PostgresTickRepository>();
+builder.Services.AddTransient<ITickRepository, PostgresTickRepository>();
 builder.Services.AddSingleton<TickService>();
 
 // Register ExchangeServerManager

@@ -56,20 +56,20 @@ public class PostgresTickRepository(IConfiguration configuration, ILogger<Postgr
 
             await using var transaction = await conn.BeginTransactionAsync(cancellationToken);
 
-            await using var copy = conn.BeginBinaryImport(
-                "COPY ticks (source, ticker, price, volume, timestamp) FROM STDIN (BINARY)");
+            await using var writer = await conn.BeginBinaryImportAsync(
+                "COPY ticks (source, ticker, price, volume, timestamp) FROM STDIN (FORMAT BINARY)", cancellationToken);
 
             foreach (var tick in ticksList)
             {
-                await copy.StartRowAsync(cancellationToken);
-                await copy.WriteAsync(tick.Source ?? string.Empty, cancellationToken);
-                await copy.WriteAsync(tick.Ticker ?? string.Empty, cancellationToken);
-                await copy.WriteAsync(tick.Price, cancellationToken);
-                await copy.WriteAsync(tick.Volume, cancellationToken);
-                await copy.WriteAsync(tick.Timestamp, cancellationToken);
+                await writer.StartRowAsync(cancellationToken);
+                await writer.WriteAsync(tick.Source ?? string.Empty, cancellationToken);
+                await writer.WriteAsync(tick.Ticker ?? string.Empty, cancellationToken);
+                await writer.WriteAsync(tick.Price, cancellationToken);
+                await writer.WriteAsync(tick.Volume, cancellationToken);
+                await writer.WriteAsync(tick.Timestamp, cancellationToken);
             }
 
-            await copy.CompleteAsync(cancellationToken);
+            await writer.CompleteAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }
         catch (Exception ex)
