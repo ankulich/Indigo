@@ -23,7 +23,6 @@ builder.Services.AddSingleton<TickNormalizerFactory>(sp =>
     factory.Register(new BinanceTickNormalizer());
     factory.Register(new CoinbaseTickNormalizer());
     factory.Register(new ForexTickNormalizer());
-    factory.Register(new DefaultTickNormalizer());
 
     return factory;
 });
