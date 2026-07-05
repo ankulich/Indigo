@@ -36,12 +36,4 @@ public class TickNormalizerFactory
 
         return normalizer;
     }
-
-    /// <summary>
-    /// Проверяет, существует ли нормализатор для указанной биржи.
-    /// </summary>
-    public bool HasNormalizer(string exchangeName)
-    {
-        return _normalizers.ContainsKey(exchangeName);
-    }
 }
