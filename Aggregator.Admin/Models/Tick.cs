@@ -20,8 +20,5 @@ namespace Aggregator.Admin.Models
 
         [Display(Name = "Timestamp")]
         public DateTime Timestamp { get; set; }
-
-        [Display(Name = "Created At")]
-        public DateTime CreatedAt { get; set; }
     }
 }
