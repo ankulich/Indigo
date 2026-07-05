@@ -9,20 +9,15 @@ namespace Aggregator.Api.Services;
 /// <summary>
 /// Реализация репозитория тиков для PostgreSQL.
 /// </summary>
-public class PostgresTickRepository : ITickRepository
+public class PostgresTickRepository(IConfiguration configuration, ILogger<PostgresTickRepository> logger) : ITickRepository
 {
-    private readonly string _connectionString;
-    private readonly ILogger<PostgresTickRepository> _logger;
-
-    public PostgresTickRepository(IConfiguration configuration, ILogger<PostgresTickRepository> logger)
-    {
-        _connectionString = configuration.GetConnectionString("DefaultConnection");
-        _logger = logger;
-    }
+    private readonly string _connectionString = configuration.GetConnectionString("DefaultConnection")
+        ?? throw new ArgumentNullException("Connection string 'DefaultConnection' is not configured.");
+    private readonly ILogger<PostgresTickRepository> _logger = logger;
 
     public async Task SaveAsync(NormalizedTick tick, CancellationToken cancellationToken = default)
     {
-        if (tick == null) throw new ArgumentNullException(nameof(tick));
+        ArgumentNullException.ThrowIfNull(tick);
 
         try
         {
@@ -49,31 +44,37 @@ public class PostgresTickRepository : ITickRepository
 
     public async Task SaveRangeAsync(IEnumerable<NormalizedTick> ticks, CancellationToken cancellationToken = default)
     {
-        if (ticks == null) throw new ArgumentNullException(nameof(ticks));
+        ArgumentNullException.ThrowIfNull(ticks);
+
+        var ticksList = ticks.ToList();
+        if (ticksList.Count == 0) return;
 
         try
         {
             await using var conn = new NpgsqlConnection(_connectionString);
             await conn.OpenAsync(cancellationToken);
 
-            await using var cmd = new NpgsqlCommand(
-                "INSERT INTO ticks (source, ticker, price, volume, timestamp) VALUES (@s, @t, @p, @v, @ts)", conn);
+            await using var transaction = await conn.BeginTransactionAsync(cancellationToken);
 
-            foreach (var tick in ticks)
+            await using var copy = conn.BeginBinaryImport(
+                "COPY ticks (source, ticker, price, volume, timestamp) FROM STDIN (BINARY)");
+
+            foreach (var tick in ticksList)
             {
-                cmd.Parameters.Clear();
-                cmd.Parameters.AddWithValue("@s", tick.Source);
-                cmd.Parameters.AddWithValue("@t", tick.Ticker);
-                cmd.Parameters.AddWithValue("@p", tick.Price);
-                cmd.Parameters.AddWithValue("@v", tick.Volume);
-                cmd.Parameters.AddWithValue("@ts", tick.Timestamp);
-
-                await cmd.ExecuteNonQueryAsync(cancellationToken);
+                await copy.StartRowAsync(cancellationToken);
+                await copy.WriteAsync(tick.Source ?? string.Empty, cancellationToken);
+                await copy.WriteAsync(tick.Ticker ?? string.Empty, cancellationToken);
+                await copy.WriteAsync(tick.Price, cancellationToken);
+                await copy.WriteAsync(tick.Volume, cancellationToken);
+                await copy.WriteAsync(tick.Timestamp, cancellationToken);
             }
+
+            await copy.CompleteAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to save range of ticks");
+            _logger.LogError(ex, "Failed to save range of {Count} ticks", ticksList.Count);
             throw;
         }
     }

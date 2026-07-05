@@ -32,12 +32,9 @@ public class KafkaProducerService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        // Создаём топики для каждого exchange
-        foreach (var exchangeName in _exchangeNames)
-        {
-            var topicName = $"ticks-{exchangeName.ToLower()}";
-            await CreateTopicIfNotExists(topicName, stoppingToken);
-        }
+        // Создаём топик для exchange
+        var topicName = $"ticks";
+        await CreateTopicIfNotExists(topicName, stoppingToken);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -58,7 +55,6 @@ public class KafkaProducerService : BackgroundService
                 foreach (var tick in batch)
                 {
                     var json = JsonSerializer.Serialize(tick);
-                    var topicName = $"ticks-{tick.Source.ToLower()}";
                     await _producer.ProduceAsync(topicName, new Message<Null, string> { Value = json }, stoppingToken);
                 }
             }

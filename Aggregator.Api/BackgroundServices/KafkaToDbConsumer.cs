@@ -1,15 +1,12 @@
 ﻿using System.Text.Json;
 using Aggregator.Core.Models;
 using Aggregator.Core.Services;
-using Aggregator.Api.Services;
 using Confluent.Kafka;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
 
 namespace Aggregator.Api.BackgroundServices;
 
 /// <summary>
-/// Фоновый сервис для потребления тиков из Kafka и сохранения в БД.
+/// Фоновый сервис для потребления тиков из Kafka и сохранения в БД с батчингом.
 /// </summary>
 public class KafkaToDbConsumer : BackgroundService
 {
@@ -18,6 +15,9 @@ public class KafkaToDbConsumer : BackgroundService
     private readonly ITickRepository _repository;
     private readonly TickRetryQueue _retryQueue;
     private readonly ILogger<KafkaToDbConsumer> _logger;
+    private readonly int _minBatchSize;
+    private readonly int _maxBatchSize;
+    private readonly TimeSpan _batchInterval;
 
     public KafkaToDbConsumer(
         IMetricsService metrics,
@@ -30,6 +30,10 @@ public class KafkaToDbConsumer : BackgroundService
         _retryQueue = retryQueue ?? throw new ArgumentNullException(nameof(retryQueue));
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
+        _minBatchSize = configuration.GetValue<int>("Kafka:MinBatchSize", 100);
+        _maxBatchSize = configuration.GetValue<int>("Kafka:MaxBatchSize", 5000);
+        _batchInterval = configuration.GetValue<TimeSpan>("Kafka:BatchInterval", TimeSpan.FromSeconds(5));
 
         var bootstrapServers = configuration.GetValue<string>("Kafka:BootstrapServers");
 
@@ -47,6 +51,9 @@ public class KafkaToDbConsumer : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        var batch = new List<NormalizedTick>(_maxBatchSize);
+        var lastSaveTime = DateTimeOffset.UtcNow;
+
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -56,10 +63,22 @@ public class KafkaToDbConsumer : BackgroundService
 
                 if (tick == null) continue;
 
-                await _repository.SaveAsync(tick, stoppingToken);
+                batch.Add(tick);
+                _consumer.Commit(result);
 
-                _metrics.AddSavedToDb(1);
-                _consumer.Commit();
+                // Вычисляем динамический размер батча на основе глубины очереди
+                var currentQueueDepth = _metrics.QueueDepth;
+                var dynamicBatchSize = CalculateDynamicBatchSize(currentQueueDepth);
+
+                var shouldSaveBySize = batch.Count >= dynamicBatchSize;
+                var shouldSaveByTime = DateTimeOffset.UtcNow - lastSaveTime >= _batchInterval;
+
+                if (shouldSaveBySize || shouldSaveByTime)
+                {
+                    await SaveBatchAsync(batch, stoppingToken);
+                    batch.Clear();
+                    lastSaveTime = DateTimeOffset.UtcNow;
+                }
             }
             catch (OperationCanceledException)
             {
@@ -67,28 +86,80 @@ public class KafkaToDbConsumer : BackgroundService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "[DB Error] Failed to save tick. Adding to retry queue.");
+                _logger.LogError(ex, "[DB Error] Failed to process tick. Adding remaining batch to retry queue.");
 
-                // Пытаемся извлечь tick из сообщения и добавить в очередь повторных попыток
-                try
+                // Добавляем весь текущий батч в очередь повторных попыток
+                foreach (var tick in batch)
                 {
-                    var result = _consumer.Consume(TimeSpan.Zero);
-                    if (result != null && result.Message.Value != null)
+                    try
                     {
-                        var tick = JsonSerializer.Deserialize<NormalizedTick>(result.Message.Value);
-                        if (tick != null)
-                        {
-                            _retryQueue.Enqueue(tick);
-                            _consumer.Commit();
-                        }
+                        _retryQueue.Enqueue(tick);
+                    }
+                    catch (Exception enqueueEx)
+                    {
+                        _logger.LogError(enqueueEx, "[DB Error] Could not enqueue tick for retry.");
                     }
                 }
-                catch (Exception retryEx)
+                batch.Clear();
+            }
+        }
+
+        // Сохраняем оставшиеся тики при остановке сервиса
+        if (batch.Count > 0)
+        {
+            try
+            {
+                await SaveBatchAsync(batch, stoppingToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[DB Error] Failed to save final batch. Adding to retry queue.");
+                foreach (var tick in batch)
                 {
-                    _logger.LogError(retryEx, "[DB Error] Could not extract tick for retry queue.");
+                    try
+                    {
+                        _retryQueue.Enqueue(tick);
+                    }
+                    catch (Exception enqueueEx)
+                    {
+                        _logger.LogError(enqueueEx, "[DB Error] Could not enqueue tick for retry.");
+                    }
                 }
             }
         }
     }
+
+    /// <summary>
+    /// Вычисляет динамический размер батча на основе глубины очереди.
+    /// </summary>
+    private int CalculateDynamicBatchSize(int queueDepth)
+    {
+        if (queueDepth <= 0)
+            return _minBatchSize;
+
+        // Линейная интерполяция между минимальным и максимальным размером батча
+        // Чем больше глубина очереди, тем больше размер батча
+        var ratio = (double)queueDepth / _maxBatchSize;
+        ratio = Math.Min(1.0, Math.Max(0.0, ratio)); // Ограничиваем от 0 до 1
+
+        return (int)(_minBatchSize + (_maxBatchSize - _minBatchSize) * ratio);
+    }
+
+    private async Task SaveBatchAsync(List<NormalizedTick> batch, CancellationToken cancellationToken)
+    {
+        if (batch.Count == 0) return;
+
+        await _repository.SaveRangeAsync(batch, cancellationToken);
+        _metrics.AddSavedToDb(batch.Count);
+        _logger.LogDebug("Saved batch of {BatchSize} ticks to database.", batch.Count);
+    }
 }
+
+
+
+
+
+
+
+
 
