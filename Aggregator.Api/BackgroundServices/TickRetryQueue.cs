@@ -33,7 +33,7 @@ public class TickRetryQueue : BackgroundService, ITickRetryQueue
         _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _bootstrapServers = configuration.GetValue<string>("Kafka:BootstrapServers") ?? "localhost:9092";
+        _bootstrapServers = configuration.GetValue<string>("Kafka:BootstrapServers");
 
         var producerConfig = new ProducerConfig { BootstrapServers = _bootstrapServers };
         _producer = new ProducerBuilder<Null, string>(producerConfig).Build();
