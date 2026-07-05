@@ -21,18 +21,6 @@ namespace Aggregator.Admin.Controllers
             return View(servers);
         }
 
-        public IActionResult Logs(string name)
-        {
-            if (string.IsNullOrEmpty(name))
-                return BadRequest("Server name is required");
-
-            var server = _serverManager.GetServer(name);
-            if (server == null)
-                return NotFound();
-
-            return View(server);
-        }
-
         public IActionResult Settings(string name)
         {
             if (string.IsNullOrEmpty(name))
@@ -45,7 +33,6 @@ namespace Aggregator.Admin.Controllers
             return View(server);
         }
 
-        [HttpPost]
         public async Task<IActionResult> UpdateFrequency(string name, int frequency)
         {
             if (string.IsNullOrEmpty(name))
@@ -67,7 +54,6 @@ namespace Aggregator.Admin.Controllers
             return RedirectToAction("Settings", new { name = name });
         }
 
-        [HttpPost]
         public async Task<IActionResult> Start(string name)
         {
             if (string.IsNullOrEmpty(name))
@@ -77,7 +63,6 @@ namespace Aggregator.Admin.Controllers
             return RedirectToAction("Index");
         }
 
-        [HttpPost]
         public async Task<IActionResult> Stop(string name)
         {
             if (string.IsNullOrEmpty(name))
@@ -87,7 +72,6 @@ namespace Aggregator.Admin.Controllers
             return RedirectToAction("Index");
         }
 
-        [HttpPost]
         public async Task<IActionResult> Disconnect(string name)
         {
             if (string.IsNullOrEmpty(name))
@@ -102,7 +86,6 @@ namespace Aggregator.Admin.Controllers
             return RedirectToAction("Index");
         }
 
-        [HttpPost]
         public async Task<IActionResult> Resend(string name, int count)
         {
             if (string.IsNullOrEmpty(name))

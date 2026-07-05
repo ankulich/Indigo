@@ -54,8 +54,6 @@ public class PostgresTickRepository(IConfiguration configuration, ILogger<Postgr
             await using var conn = new NpgsqlConnection(_connectionString);
             await conn.OpenAsync(cancellationToken);
 
-            await using var transaction = await conn.BeginTransactionAsync(cancellationToken);
-
             await using var writer = await conn.BeginBinaryImportAsync(
                 "COPY ticks (source, ticker, price, volume, timestamp) FROM STDIN (FORMAT BINARY)", cancellationToken);
 
@@ -70,7 +68,6 @@ public class PostgresTickRepository(IConfiguration configuration, ILogger<Postgr
             }
 
             await writer.CompleteAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
         }
         catch (Exception ex)
         {

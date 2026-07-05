@@ -116,14 +116,14 @@ public class TickRetryQueue : BackgroundService, ITickRetryQueue
 
             var metadata = adminClient.GetMetadata(timeout: TimeSpan.FromSeconds(10));
             var existingTopics = metadata.Topics.Select(t => t.Topic).ToHashSet();
-            
+
             if (!existingTopics.Contains(topicName))
             {
-                var topicSpecification = new TopicSpecification 
-                { 
-                    Name = topicName, 
-                    NumPartitions = 1, 
-                    ReplicationFactor = 1 
+                var topicSpecification = new TopicSpecification
+                {
+                    Name = topicName,
+                    NumPartitions = 1,
+                    ReplicationFactor = 1
                 };
                 var options = new CreateTopicsOptions { RequestTimeout = TimeSpan.FromSeconds(30) };
                 options.OperationTimeout = TimeSpan.FromSeconds(30);
