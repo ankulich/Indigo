@@ -31,9 +31,9 @@ public class KafkaToDbConsumer : BackgroundService
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-        _minBatchSize = configuration.GetValue<int>("Kafka:MinBatchSize", 100);
+        _minBatchSize = configuration.GetValue<int>("Kafka:MinBatchSize", 10);
         _maxBatchSize = configuration.GetValue<int>("Kafka:MaxBatchSize", 5000);
-        _batchInterval = configuration.GetValue<TimeSpan>("Kafka:BatchInterval", TimeSpan.FromSeconds(5));
+        _batchInterval = configuration.GetValue<TimeSpan>("Kafka:BatchInterval", TimeSpan.FromMilliseconds(1));
 
         var bootstrapServers = configuration.GetValue<string>("Kafka:BootstrapServers");
 
